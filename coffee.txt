@@ -28,7 +28,10 @@ Group2.router = PassiveRouter
 Report.nrofReports = 0
 Report.reportDir = reports
 
-ProhibitedMap.nrofMapFiles = 1
+ProhibitedMap.nrofMapFiles = 3
 ProhibitedMap.mapFile1 = data/Coffee/FMI_building.wkt
+ProhibitedMap.mapFile2 = data/Coffee/coffee_shop.wkt
+ProhibitedMap.mapFile3 = data/Coffee/table_restrictions.wkt
+
 ProhibitedMap.startingPoint = data/Coffee/FMI_starting_point.wkt
 ProhibitedMap.allowedZone = data/Coffee/FMI_allowed.wkt

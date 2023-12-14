@@ -42,6 +42,9 @@ public class ProhibitedMap extends MovementModel {
 	private Path2D plMap;
 	public Path2D pAllowed;
 
+	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, QUEUE };
+	public STATE nodestate = STATE.NONARRIVED;
+
 
 	public ProhibitedMap() {
 		readMap();
@@ -50,6 +53,8 @@ public class ProhibitedMap extends MovementModel {
 	public ProhibitedMap(Settings settings) {
 		super(settings);
 		readMap();
+
+		nodestate = STATE.NONARRIVED;
 	}
 
 	public ProhibitedMap(ProhibitedMap pMap) {
@@ -59,6 +64,7 @@ public class ProhibitedMap extends MovementModel {
 		this.pStartRegion = pMap.getPStartRegion();
 		this.plMap = pMap.getPMap();
 		pAllowed = pMap.pAllowed;
+		nodestate = pMap.nodestate;
 	}
 
 	private void readMap() {
@@ -148,24 +154,39 @@ public class ProhibitedMap extends MovementModel {
 		return true;
 	}
 
+	// TODO:
+	public static final int frequency = 6500;
+	public static int arrived = frequency;
+
 	@Override
 	public Path getPath() {
-	  // Creates a new path from the previous waypoint to a new one.
-	  final Path p;
-	  p = new Path( super.generateSpeed() );
-	  p.addWaypoint( this.lastWaypoint.clone() );
-  
-	  // Add only one point. An arbitrary number of Coords could be added to
-	  // the path here and the simulator will follow the full path before
-	  // asking for the next one.
-	  Coord c = this.randomCoord();
-	  do {
-		c = this.randomCoord();
-	  } while ( !pAllowed.contains(c.getX(), c.getY()) );
+		// Creates a new path from the previous waypoint to a new one.
+		final Path p;
+		p = new Path( super.generateSpeed() );
+		p.addWaypoint( this.lastWaypoint.clone() );
 
-	  p.addWaypoint( c );
-	  this.lastWaypoint = c;
-	  return p;
+		if (nodestate == STATE.NONARRIVED) {
+			arrived -= 1;
+			if (arrived == 0) {
+				nodestate = STATE.ARRIVED;
+				arrived = frequency;
+			} else {
+				return p;
+			}
+		}
+
+	
+		// Add only one point. An arbitrary number of Coords could be added to
+		// the path here and the simulator will follow the full path before
+		// asking for the next one.
+		Coord c = this.randomCoord();
+		do {
+			c = this.randomCoord();
+		} while ( !pAllowed.contains(c.getX(), c.getY()) );
+
+		p.addWaypoint( c );
+		this.lastWaypoint = c;
+		return p;
 	}
 
 	@Override
