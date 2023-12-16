@@ -5,6 +5,7 @@
 package movement;
 
 import input.WKTMapReader;
+import javafx.geometry.Point2D;
 import javafx.scene.shape.Polygon;
 
 import java.io.File;
@@ -20,6 +21,9 @@ import java.util.Random;
 
 import java.awt.geom.Path2D;
 import java.awt.geom.Line2D;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * The moving nodes are forbidden of touching the edges of the map. It is
@@ -45,10 +49,22 @@ public class ProhibitedMap extends MovementModel {
 	private Path2D pStartRegion;
 	private Path2D plMap;
 	public Path2D pAllowed;
+	public List<MapNode> qPostitions;
 
-	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, INDEPENDENT_QUEUE };
+	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, INDEPENDENT_QUEUE, BUYCOFFEE };
 	public STATE nodestate = STATE.NONARRIVED;
 
+	public class MapNodesComparator implements Comparator<MapNode> {
+		@Override
+		public int compare(MapNode a, MapNode b) {
+			if(a.getLocation().getY() == b.getLocation().getY()) {
+				return 0;
+			} else if(a.getLocation().getY() < b.getLocation().getY()) {
+				return -1;
+			}
+			return 1;
+		}
+	}
 
 	public ProhibitedMap() {
 		readMap();
@@ -70,6 +86,7 @@ public class ProhibitedMap extends MovementModel {
 		pAllowed = pMap.pAllowed;
 		nodestate = pMap.nodestate;
 		coffeShopQueue = pMap.coffeShopQueue;
+		qPostitions = pMap.qPostitions;
 	}
 
 	private void readMap() {
@@ -140,6 +157,11 @@ public class ProhibitedMap extends MovementModel {
 		mTP.translate(-offset.getX(), -offset.getY());
 	
 		SimMap qCSTP = qCHSP.getMap();
+		List<MapNode> list = new ArrayList<>(qCHSP.getNodes());
+		list.sort(new MapNodesComparator());
+		this.qPostitions = list;
+
+		/* sort the nodes based on Y */
 		qCSTP.mirror();
 		qCSTP.translate(-offset.getX(), -offset.getY());
 
@@ -190,6 +212,9 @@ public class ProhibitedMap extends MovementModel {
 	public static final int frequency = 6500;
 	public static int arrived = frequency;
 	public static double independent_freq = 0.5;
+	public static int queue_size = 0;
+	public static final int MAX_QUEUE = 10;
+	public int queue_position = 0; 
 
 	@Override
 	public Path getPath() {
@@ -223,7 +248,7 @@ public class ProhibitedMap extends MovementModel {
 		if (nodestate == STATE.INDEPENDENT) {
 			// move closer to the queue
 			Coord c = this.randomCoord();
-			Coord queueEnqPos = coffeShopQueue.getNodes().get(
+			Coord queueEnqPos = qPostitions.get(
 				coffeShopQueue.getNodes().size() - 1
 			).getLocation();
 			double rDistance = this.lastWaypoint.distance(queueEnqPos);
@@ -232,18 +257,41 @@ public class ProhibitedMap extends MovementModel {
 			} while ( !(pAllowed.contains(c.getX(), c.getY()) && c.distance(queueEnqPos) <= rDistance) );
 
 			rDistance = c.distance(queueEnqPos);
-			System.out.println(c.distance(queueEnqPos));
 			if (rDistance <= 5) {
-				// enroll in queue
-				System.out.println(rDistance);
-				nodestate = STATE.INDEPENDENT_QUEUE;
+				if (queue_size < MAX_QUEUE) {
+					nodestate = STATE.INDEPENDENT_QUEUE;
+					queue_position = coffeShopQueue.getNodes().size() - 2;
+				} else {
+					nodestate = STATE.DEPENDENT;
+				}
 			}
 
 			p.addWaypoint( c );
 			this.lastWaypoint = c;
 			return p;
 		} else if (nodestate == STATE.INDEPENDENT_QUEUE) {
-			return p;
+			// change the speed
+			Path pq = new Path( super.generateSpeed() / 10 );
+			pq.addWaypoint( this.lastWaypoint.clone() );
+
+			// move closer to the queue
+			Coord queueEnqPos = qPostitions.get(
+				queue_position
+			).getLocation();
+
+			Coord newPost = getDestinationCoordinate(this.lastWaypoint.getX(), this.lastWaypoint.getY(), 
+						queueEnqPos.getX(), queueEnqPos.getY(), 0.10);
+			if (newPost.distance(queueEnqPos) < 1) {
+				queue_position -= 1;
+			}
+
+			if (queue_position == -1) {
+				queue_size -= 1;
+				nodestate = STATE.BUYCOFFEE;
+			}
+			pq.addWaypoint( newPost );
+			this.lastWaypoint = newPost;
+			return pq;
 		} else {
 			// Add only one point. An arbitrary number of Coords could be added to
 			// the path here and the simulator will follow the full path before
@@ -297,4 +345,20 @@ public class ProhibitedMap extends MovementModel {
 	public Path2D getPMap() {
 		return plMap;
 	}
+
+	private static Coord getDestinationCoordinate(double x, double y, double x1, double y1, double distance) {
+        double deltaX = x1 - x;
+        double deltaY = y1 - y;
+
+        double length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        double normalizedDeltaX = deltaX / length;
+        double normalizedDeltaY = deltaY / length;
+
+        double newX = x + normalizedDeltaX * distance;
+        double newY = y + normalizedDeltaY * distance;
+
+        return new Coord(newX, newY);
+    }
+
 }
