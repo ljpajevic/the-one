@@ -16,6 +16,7 @@ import movement.map.SimMap;
 import core.Coord;
 import core.Settings;
 import core.SimError;
+import java.util.Random;
 
 import java.awt.geom.Path2D;
 import java.awt.geom.Line2D;
@@ -32,18 +33,20 @@ public class ProhibitedMap extends MovementModel {
 	public static final String STARTING_POINT_s = "startingPoint";
 	public static final String ALLOWD_S = "allowedZone";
 	public static final String TABLE_S = "tableRestrictions";
+	public static final String COFFEE_QUEUE_S = "coffeequeue";
 
 	/** sim map for the model */
 	private SimMap map = null;
 	private SimMap startRegion;
 	private Coord lastWaypoint;
+	public SimMap coffeShopQueue;
 
 	/** use java polygon */
 	private Path2D pStartRegion;
 	private Path2D plMap;
 	public Path2D pAllowed;
 
-	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, QUEUE };
+	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, INDEPENDENT_QUEUE };
 	public STATE nodestate = STATE.NONARRIVED;
 
 
@@ -66,6 +69,7 @@ public class ProhibitedMap extends MovementModel {
 		this.plMap = pMap.getPMap();
 		pAllowed = pMap.pAllowed;
 		nodestate = pMap.nodestate;
+		coffeShopQueue = pMap.coffeShopQueue;
 	}
 
 	private void readMap() {
@@ -108,6 +112,15 @@ public class ProhibitedMap extends MovementModel {
 			throw new SimError(e.toString(), e);
 		}
 
+		WKTMapReader qCHSP = new WKTMapReader(true);
+		try {
+			String path = settings.getSetting(COFFEE_QUEUE_S);
+			qCHSP.addPaths(new File(path), 0);
+		} catch (IOException e) {
+			throw new SimError(e.toString(), e);
+		}
+
+
 		// accumulate all maps
 		simMap = r.getMap();
 		simMap.mirror();
@@ -125,6 +138,12 @@ public class ProhibitedMap extends MovementModel {
 		SimMap mTP = tP.getMap();
 		mTP.mirror();
 		mTP.translate(-offset.getX(), -offset.getY());
+	
+		SimMap qCSTP = qCHSP.getMap();
+		qCSTP.mirror();
+		qCSTP.translate(-offset.getX(), -offset.getY());
+
+		this.coffeShopQueue = qCSTP;
 
 		this.startRegion = mSP;
 		List<MapNode> mn = startRegion.getNodes();
@@ -170,6 +189,7 @@ public class ProhibitedMap extends MovementModel {
 	// TODO:
 	public static final int frequency = 6500;
 	public static int arrived = frequency;
+	public static double independent_freq = 0.5;
 
 	@Override
 	public Path getPath() {
@@ -182,24 +202,61 @@ public class ProhibitedMap extends MovementModel {
 			arrived -= 1;
 			if (arrived == 0) {
 				nodestate = STATE.ARRIVED;
+				this.lastWaypoint = new Coord(this.lastWaypoint.getX() - 10, this.lastWaypoint.getY() + 20);
+				p.addWaypoint( this.lastWaypoint );
 				arrived = frequency;
+				return p;
 			} else {
 				return p;
 			}
 		}
 
-	
-		// Add only one point. An arbitrary number of Coords could be added to
-		// the path here and the simulator will follow the full path before
-		// asking for the next one.
-		Coord c = this.randomCoord();
-		do {
-			c = this.randomCoord();
-		} while ( !pAllowed.contains(c.getX(), c.getY()) );
+		if (nodestate == STATE.ARRIVED) {
+			// decide if it is going to coffee shop or the queue
+			if (rng.nextDouble() < independent_freq) {
+				nodestate = STATE.INDEPENDENT;
+			} else {
+				nodestate = STATE.DEPENDENT;
+			}
+		}
+		
+		if (nodestate == STATE.INDEPENDENT) {
+			// move closer to the queue
+			Coord c = this.randomCoord();
+			Coord queueEnqPos = coffeShopQueue.getNodes().get(
+				coffeShopQueue.getNodes().size() - 1
+			).getLocation();
+			double rDistance = this.lastWaypoint.distance(queueEnqPos);
+			do {
+				c = this.randomCoord();
+			} while ( !(pAllowed.contains(c.getX(), c.getY()) && c.distance(queueEnqPos) <= rDistance) );
 
-		p.addWaypoint( c );
-		this.lastWaypoint = c;
-		return p;
+			rDistance = c.distance(queueEnqPos);
+			System.out.println(c.distance(queueEnqPos));
+			if (rDistance <= 5) {
+				// enroll in queue
+				System.out.println(rDistance);
+				nodestate = STATE.INDEPENDENT_QUEUE;
+			}
+
+			p.addWaypoint( c );
+			this.lastWaypoint = c;
+			return p;
+		} else if (nodestate == STATE.INDEPENDENT_QUEUE) {
+			return p;
+		} else {
+			// Add only one point. An arbitrary number of Coords could be added to
+			// the path here and the simulator will follow the full path before
+			// asking for the next one.
+			Coord c = this.randomCoord();
+			do {
+				c = this.randomCoord();
+			} while ( !pAllowed.contains(c.getX(), c.getY()) );
+
+			p.addWaypoint( c );
+			this.lastWaypoint = c;
+			return p;
+		}
 	}
 
 	@Override
