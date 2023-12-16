@@ -33,5 +33,6 @@ ProhibitedMap.mapFile1 = data/Coffee/FMI_building.wkt
 ProhibitedMap.mapFile2 = data/Coffee/coffee_shop.wkt
 ProhibitedMap.mapFile3 = data/Coffee/table_restrictions.wkt
 
+ProhibitedMap.tableRestrictions = data/Coffee/table_restrictions.wkt
 ProhibitedMap.startingPoint = data/Coffee/FMI_starting_point.wkt
 ProhibitedMap.allowedZone = data/Coffee/FMI_allowed.wkt

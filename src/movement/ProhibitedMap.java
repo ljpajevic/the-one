@@ -31,6 +31,7 @@ public class ProhibitedMap extends MovementModel {
 	public static final String FILE_S = "mapFile";
 	public static final String STARTING_POINT_s = "startingPoint";
 	public static final String ALLOWD_S = "allowedZone";
+	public static final String TABLE_S = "tableRestrictions";
 
 	/** sim map for the model */
 	private SimMap map = null;
@@ -99,6 +100,14 @@ public class ProhibitedMap extends MovementModel {
 			throw new SimError(e.toString(), e);
 		}
 
+		WKTMapReader tP = new WKTMapReader(true);
+		try {
+			String path = settings.getSetting(ALLOWD_S);
+			tP.addPaths(new File(path), 0);
+		} catch (IOException e) {
+			throw new SimError(e.toString(), e);
+		}
+
 		// accumulate all maps
 		simMap = r.getMap();
 		simMap.mirror();
@@ -112,6 +121,10 @@ public class ProhibitedMap extends MovementModel {
 		SimMap mAZ = dP.getMap();
 		mAZ.mirror();
 		mAZ.translate(-offset.getX(), -offset.getY());
+	
+		SimMap mTP = tP.getMap();
+		mTP.mirror();
+		mTP.translate(-offset.getX(), -offset.getY());
 
 		this.startRegion = mSP;
 		List<MapNode> mn = startRegion.getNodes();
