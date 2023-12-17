@@ -252,11 +252,15 @@ public class SimScenario implements Serializable {
 	 * @return SimMap or null if no map is used
 	 */
 	public SimMap getMap() {
-		return this.simMap;
+		return this.prohibitedMap.getMap();
 	}
 
 	public SimMap getProhibitedMap() {
-		return this.prohibitedMap.getMap();
+		return this.prohibitedMap.getRestrMap();
+	}
+
+	public SimMap getQueue() {
+		return this.prohibitedMap.getQueueMap();
 	}
 
 	/**

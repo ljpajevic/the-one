@@ -8,7 +8,9 @@ import input.WKTMapReader;
 import javafx.geometry.Point2D;
 import javafx.scene.shape.Polygon;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.List;
 
@@ -19,9 +21,12 @@ import core.Settings;
 import core.SimError;
 import java.util.Random;
 
+import javax.sound.sampled.Line;
+
 import java.awt.geom.Path2D;
 import java.awt.geom.Line2D;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
@@ -37,21 +42,27 @@ public class ProhibitedMap extends MovementModel {
 	public static final String STARTING_POINT_s = "startingPoint";
 	public static final String ALLOWD_S = "allowedZone";
 	public static final String TABLE_S = "tableRestrictions";
+	public static final String QUEUE_S = "coffeeRestrictions";
 	public static final String COFFEE_QUEUE_S = "coffeequeue";
+	public static final String CLASSROOM_s = "classroom";
 
 	/** sim map for the model */
 	private SimMap map = null;
 	private SimMap startRegion;
 	private Coord lastWaypoint;
 	public SimMap coffeShopQueue;
+	public SimMap restredAreasMap;
 
 	/** use java polygon */
 	private Path2D pStartRegion;
 	private Path2D plMap;
 	public Path2D pAllowed;
 	public List<MapNode> qPostitions;
+	public List<List<Coord>> restredAreas;
+	public List<Coord> classroom;
 
-	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, INDEPENDENT_QUEUE, BUYCOFFEE };
+	enum STATE { NONARRIVED, ARRIVED, DEPENDENT, INDEPENDENT, INDEPENDENT_QUEUE, BUYCOFFEE, GOING_TO_CLASSROOM,
+		CLASSROOM, LEAVING, OUT, GOING_TO_TABLE, TABLE };
 	public STATE nodestate = STATE.NONARRIVED;
 
 	public class MapNodesComparator implements Comparator<MapNode> {
@@ -87,6 +98,9 @@ public class ProhibitedMap extends MovementModel {
 		nodestate = pMap.nodestate;
 		coffeShopQueue = pMap.coffeShopQueue;
 		qPostitions = pMap.qPostitions;
+		restredAreas = pMap.restredAreas;
+		restredAreasMap = pMap.restredAreasMap;
+		classroom = pMap.classroom;
 	}
 
 	private void readMap() {
@@ -121,11 +135,70 @@ public class ProhibitedMap extends MovementModel {
 			throw new SimError(e.toString(), e);
 		}
 
-		WKTMapReader tP = new WKTMapReader(true);
+		// accumulate all maps
+		simMap = r.getMap();
+		simMap.mirror();
+		Coord offset = simMap.getMinBound().clone();
+		simMap.translate(-offset.getX(), -offset.getY());
+
+		WKTMapReader restrP = new WKTMapReader(true);
+		restredAreas = new ArrayList<List<Coord>>(20);
 		try {
-			String path = settings.getSetting(ALLOWD_S);
-			tP.addPaths(new File(path), 0);
+			String path = settings.getSetting(TABLE_S);
+			restrP.addPaths(new File(path), 0);
+			/* read the files */
+			try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+				String line;
+				while ((line = br.readLine()) != null) {
+					if (line.length() < 10) {
+						continue;
+					}
+					List<Coord> polygon = processPolygon(line, -offset.getX(), -offset.getY());
+					restredAreas.add(polygon);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		} catch (IOException e) {
+			throw new SimError(e.toString(), e);
+		}
+
+		try {
+			String path = settings.getSetting(QUEUE_S);
+			/* read the files */
+			try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+				String line;
+				while ((line = br.readLine()) != null) {
+					if (line.length() < 10) {
+						continue;
+					}
+					List<Coord> polygon = processPolygon(line, -offset.getX(), -offset.getY());
+					restredAreas.add(polygon);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			throw new SimError(e.toString(), e);
+		}
+
+		/* READS CLASSROOM */
+		try {
+			String path = settings.getSetting(CLASSROOM_s);
+			/* read the files */
+			try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+				String line;
+				while ((line = br.readLine()) != null) {
+					if (line.length() < 10) {
+						continue;
+					}
+					List<Coord> polygon = processPolygon(line, -offset.getX(), -offset.getY());
+					classroom = polygon;
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
 			throw new SimError(e.toString(), e);
 		}
 
@@ -138,12 +211,6 @@ public class ProhibitedMap extends MovementModel {
 		}
 
 
-		// accumulate all maps
-		simMap = r.getMap();
-		simMap.mirror();
-		Coord offset = simMap.getMinBound().clone();
-		simMap.translate(-offset.getX(), -offset.getY());
-
 		SimMap mSP = rP.getMap();
 		mSP.mirror();
 		mSP.translate(-offset.getX(), -offset.getY());
@@ -152,9 +219,10 @@ public class ProhibitedMap extends MovementModel {
 		mAZ.mirror();
 		mAZ.translate(-offset.getX(), -offset.getY());
 	
-		SimMap mTP = tP.getMap();
+		SimMap mTP = restrP.getMap();
 		mTP.mirror();
 		mTP.translate(-offset.getX(), -offset.getY());
+		this.restredAreasMap = mTP;
 	
 		SimMap qCSTP = qCHSP.getMap();
 		List<MapNode> list = new ArrayList<>(qCHSP.getNodes());
@@ -209,12 +277,31 @@ public class ProhibitedMap extends MovementModel {
 	}
 
 	// TODO:
-	public static final int frequency = 6500;
+	public static final int frequency = 5500;
 	public static int arrived = frequency;
 	public static double independent_freq = 0.5;
+	public static double independent_freq_class = 0.5;
+	public static double BUY_COFFEE_NEXT_DST = 0.5;
 	public static int queue_size = 0;
 	public static final int MAX_QUEUE = 10;
 	public int queue_position = 0; 
+
+	public static final int TIME_BEFORE_LEAVE = 32000; 
+	public long timer = 0;
+	public Coord initialpoint ; 
+	public boolean mustleave = false;
+
+	public static final int CLASS_STARTIME = 20000, CLASS_DURATION = 10000; 
+	public int start_class_timer = CLASS_STARTIME; 
+	public int class_timer = 0; 
+	public boolean classended = false;
+
+	public int selectedTable = 0;
+
+	@Override
+	public void setTimer(int timer) {
+		this.timer = timer;
+	}
 
 	@Override
 	public Path getPath() {
@@ -223,10 +310,19 @@ public class ProhibitedMap extends MovementModel {
 		p = new Path( super.generateSpeed() );
 		p.addWaypoint( this.lastWaypoint.clone() );
 
+		if (timer > TIME_BEFORE_LEAVE) {
+			mustleave = true;
+		}
+
+		if (timer > CLASS_STARTIME + CLASS_DURATION) {
+			classended = true;
+		}	
+
 		if (nodestate == STATE.NONARRIVED) {
 			arrived -= 1;
 			if (arrived == 0) {
 				nodestate = STATE.ARRIVED;
+				initialpoint = this.lastWaypoint.clone();
 				this.lastWaypoint = new Coord(this.lastWaypoint.getX() - 10, this.lastWaypoint.getY() + 20);
 				p.addWaypoint( this.lastWaypoint );
 				arrived = frequency;
@@ -235,7 +331,6 @@ public class ProhibitedMap extends MovementModel {
 				return p;
 			}
 		}
-
 		if (nodestate == STATE.ARRIVED) {
 			// decide if it is going to coffee shop or the queue
 			if (rng.nextDouble() < independent_freq) {
@@ -243,7 +338,7 @@ public class ProhibitedMap extends MovementModel {
 			} else {
 				nodestate = STATE.DEPENDENT;
 			}
-		}
+		}	
 		
 		if (nodestate == STATE.INDEPENDENT) {
 			// move closer to the queue
@@ -268,10 +363,11 @@ public class ProhibitedMap extends MovementModel {
 
 			p.addWaypoint( c );
 			this.lastWaypoint = c;
+
 			return p;
 		} else if (nodestate == STATE.INDEPENDENT_QUEUE) {
 			// change the speed
-			Path pq = new Path( super.generateSpeed() / 10 );
+			Path pq = new Path( super.generateSpeed() / 2 );
 			pq.addWaypoint( this.lastWaypoint.clone() );
 
 			// move closer to the queue
@@ -287,24 +383,146 @@ public class ProhibitedMap extends MovementModel {
 
 			if (queue_position == -1) {
 				queue_size -= 1;
-				nodestate = STATE.BUYCOFFEE;
+				if (rng.nextDouble() < independent_freq_class) {
+					nodestate = STATE.GOING_TO_CLASSROOM;
+				} else {
+					nodestate = STATE.GOING_TO_TABLE;
+				}
+
+				/* getting out */
+				newPost = new Coord(newPost.getX() + 35, newPost.getY());
+				pq.addWaypoint( newPost );
 			}
 			pq.addWaypoint( newPost );
 			this.lastWaypoint = newPost;
 			return pq;
-		} else {
+		} else if (nodestate == STATE.GOING_TO_CLASSROOM) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+
+			// move closer to the queue
+			Coord classroomEntrance = 
+				new Coord((classroom.get(0).getX() + classroom.get(1).getX())/2, 
+						(classroom.get(0).getY() + classroom.get(1).getY())/2);
+			Coord c = this.randomCoord();
+			double rDistance = this.lastWaypoint.distance(classroomEntrance), d;
+			if (rDistance > 25) {
+				do {
+					c = this.randomCoord();
+					d = c.distance(classroomEntrance);
+				} while ( (!(pAllowed.contains(c.getX(), c.getY()) && d <= (rDistance + 5)))
+					|| checkTableRestrictions(this.lastWaypoint, c) );
+			} else {
+				c = this.lastWaypoint;
+			}
+
+			if (c.distance(classroomEntrance) < 25) {
+				nodestate = STATE.CLASSROOM;
+				pq.addWaypoint( c );
+
+				c = new Coord(c.getX() + 45, c.getY() - 20);
+				pq.addWaypoint( c );
+			} else {
+				pq.addWaypoint( c );
+
+			}
+			this.lastWaypoint = c;
+			return pq;
+		} else if (nodestate == STATE.LEAVING) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+
+			Coord c = this.randomCoord();
+			double rDistance = this.lastWaypoint.distance(initialpoint), d;
+			if (rDistance > 25) {
+				do {
+					c = this.randomCoord();
+					d = c.distance(initialpoint);
+				} while ( (!(pAllowed.contains(c.getX(), c.getY()) && d <= (rDistance + 5)))
+					|| checkTableRestrictions(this.lastWaypoint, c) );
+			} else {
+				c = this.lastWaypoint;
+			}
+
+			if (c.distance(initialpoint) < 25) {
+				nodestate = STATE.OUT;
+				pq.addWaypoint( c );
+
+				c = new Coord(c.getX() + 25, c.getY() - 10);
+				pq.addWaypoint( c );
+			} else {
+				pq.addWaypoint( c );
+
+			}
+
+			this.lastWaypoint = c;
+			return pq;
+		} else if (nodestate == STATE.CLASSROOM) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+
+			if (classended) {
+				Coord c = new Coord(this.lastWaypoint.getX() - 45, this.lastWaypoint.getY() + 30);
+				p.addWaypoint( c );
+				this.lastWaypoint = c;
+
+				nodestate = STATE.DEPENDENT;
+			}
+
+			return pq;
+		} else if (nodestate == STATE.DEPENDENT) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+			
 			// Add only one point. An arbitrary number of Coords could be added to
 			// the path here and the simulator will follow the full path before
 			// asking for the next one.
 			Coord c = this.randomCoord();
 			do {
 				c = this.randomCoord();
-			} while ( !pAllowed.contains(c.getX(), c.getY()) );
+			} while ( !pAllowed.contains(c.getX(), c.getY()) || checkTableRestrictions(this.lastWaypoint, c) );
 
-			p.addWaypoint( c );
+			pq.addWaypoint( c );
 			this.lastWaypoint = c;
-			return p;
+
+			if (mustleave) {
+				nodestate = STATE.LEAVING;
+			}
+			return pq;
+		} else if (nodestate == STATE.LEAVING) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+
+			// move closer to the queue
+			Coord c = this.randomCoord();
+			double rDistance = this.lastWaypoint.distance(initialpoint), d;
+			if (rDistance > 25) {
+				do {
+					c = this.randomCoord();
+					d = c.distance(initialpoint);
+				} while ( (!(pAllowed.contains(c.getX(), c.getY()) && d <= (rDistance + 5)))
+					|| checkTableRestrictions(this.lastWaypoint, c) );
+			} else {
+				c = this.lastWaypoint;
+			}
+
+			if (c.distance(initialpoint) < 25) {
+				//nodestate = STATE.OUT;
+				pq.addWaypoint( c );
+
+				c = new Coord(c.getX() - 5, c.getY() + 20);
+				pq.addWaypoint( c );
+			} else {
+				pq.addWaypoint( c );
+			}
+			this.lastWaypoint = c;
+			return pq;
+		} else if (nodestate == STATE.OUT) {
+			Path pq = new Path( super.generateSpeed());
+			pq.addWaypoint( this.lastWaypoint.clone() );
+			return pq;
 		}
+		return p;
 	}
 
 	@Override
@@ -329,6 +547,15 @@ public class ProhibitedMap extends MovementModel {
 	public SimMap getMap() {
 		return map;
 	}
+
+	public SimMap getRestrMap() {
+		return restredAreasMap;
+	}
+
+	public SimMap getQueueMap() {
+		return coffeShopQueue;
+	}
+
 
 	public SimMap getStartRegion() {
 		return startRegion;
@@ -359,6 +586,39 @@ public class ProhibitedMap extends MovementModel {
         double newY = y + normalizedDeltaY * distance;
 
         return new Coord(newX, newY);
+    }
+
+    private static List<Coord> processPolygon(String polygonLine, double transX, double transY) {
+        String coordinates = polygonLine.substring(polygonLine.indexOf("((") + 2, polygonLine.indexOf("))"));
+        String[] points = coordinates.split(", ");
+
+        List<Coord> polygon = new ArrayList<Coord>();
+        for (String point : points) {
+            String[] xy = point.split(" ");
+            double x = Double.parseDouble(xy[0]) + transX;
+            double y = -Double.parseDouble(xy[1]) + transY;
+            polygon.add(new Coord(x, y));
+        }
+
+        return polygon;
+    }
+
+	private boolean checkTableRestrictions(Coord start, Coord end) {
+		Line2D lineV = new Line2D.Double(start.getX(), start.getY(), end.getX(), end.getY());
+        for (int i=0; i<this.restredAreas.size(); i++) {
+			List<Coord> poly = restredAreas.get(i);
+
+			for (int j=0; j<poly.size(); j++) {
+				Coord c1 = poly.get(j);
+				Coord c2 = poly.get((j+1) % poly.size());
+				Line2D lineP = new Line2D.Double(c1.getX(), c1.getY(), c2.getX(), c2.getY());
+
+				if (lineP.intersectsLine(lineV)) {
+					return true;
+				}
+			}
+		}
+		return false;
     }
 
 }

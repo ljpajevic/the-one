@@ -74,6 +74,10 @@ public class DTNSimGUI extends DTNSimUI {
 			field.setProhibitedMap(scen.getProhibitedMap());
 		}
 
+		if (scen.getQueue() != null ) {
+			field.setQueue(scen.getQueue());
+		}
+
 
 		// if user closes the main window, call closeSim()
 		this.main.addWindowListener(new WindowAdapter() {

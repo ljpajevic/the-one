@@ -1,7 +1,7 @@
 ## Settings that define ProhibitedPolygonRwp movement with one group of nodes.
 
 Scenario.name = ProhibitedPolygon1
-Scenario.endTime = 6000
+Scenario.endTime = 70000
 Scenario.updateInterval = 0.1
 Scenario.simulateConnections = false
 MovementModel.worldSize = 1000,1000
@@ -9,14 +9,34 @@ Events.nrof = 0
 
 Scenario.nrofHostGroups = 1
 Group1.groupID = x
-Group1.nrofHosts = 100
+Group1.nrofHosts = 30
 Group1.nrofInterfaces = 1
 Group1.interface1 = myInterface
 myInterface.type = SimpleBroadcastInterface
 myInterface.transmitRange = 0
 myInterface.transmitSpeed = 0
-Group1.movementModel = ProhibitedPolygonRwp
+Group1.movementModel = ProhibitedMap
 Group1.router = PassiveRouter
+
+Group2.movementModel = ProhibitedMap
+Group2.groupID = y
+Group2.nrofHosts = 100
+Group2.nrofInterfaces = 1
+Group2.interface1 = myInterface
+Group2.router = PassiveRouter
 
 Report.nrofReports = 0
 Report.reportDir = reports
+
+ProhibitedMap.nrofMapFiles = 3
+ProhibitedMap.mapFile1 = data/Coffee/FMI_building.wkt
+ProhibitedMap.mapFile2 = data/Coffee/coffee_shop.wkt
+ProhibitedMap.mapFile3 = data/Coffee/table_restrictions.wkt
+ProhibitedMap.mapFile4 = data/Coffee/coffee_shop.wkt
+
+ProhibitedMap.classroom = data/Coffee/classroom.wkt
+ProhibitedMap.coffeeRestrictions = data/Coffee/coffee_restricted.wkt
+ProhibitedMap.coffeequeue = data/Coffee/coffee_shop_queue.wkt
+ProhibitedMap.tableRestrictions = data/Coffee/table_restrictions.wkt
+ProhibitedMap.startingPoint = data/Coffee/FMI_starting_point.wkt
+ProhibitedMap.allowedZone = data/Coffee/FMI_allowed.wkt
