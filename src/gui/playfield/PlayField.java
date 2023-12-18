@@ -36,6 +36,8 @@ public class PlayField extends JPanel {
 	private List<PlayFieldGraphic> overlayGraphics;
 	private boolean autoClearOverlay;	// automatically clear overlay graphics
 	private MapGraphic mapGraphic;
+	private MapGraphic prohibitedMapGraphic;
+	private MapGraphic queueGraphic;
 	private boolean showMapGraphic;
 	private ScaleReferenceGraphic refGraphic;
 	private boolean focusOnClick;
@@ -160,6 +162,16 @@ public class PlayField extends JPanel {
 		this.updateUnderlyingImageTransform();
 	}
 
+	public void setProhibitedMap(SimMap simMap) {
+		this.prohibitedMapGraphic = new MapGraphic(simMap);
+		this.updateUnderlyingImageTransform();
+	}
+
+	public void setQueue(SimMap simMap) {
+		this.queueGraphic = new MapGraphic(simMap);
+		this.updateUnderlyingImageTransform();
+	}
+
 	/**
 	 * Enables/disables showing of map graphics
 	 * @param show True if the map graphics should be shown (false if not)
@@ -221,6 +233,14 @@ public class PlayField extends JPanel {
 		// draw map (is exists and drawing requested)
 		if (mapGraphic != null && showMapGraphic) {
 			mapGraphic.draw(g2);
+		}
+
+		if (prohibitedMapGraphic != null) {
+			prohibitedMapGraphic.draw(g2, Color.red);
+		}
+	
+		if (prohibitedMapGraphic != null) {
+			queueGraphic.draw(g2, Color.cyan);
 		}
 
 		// draw hosts
