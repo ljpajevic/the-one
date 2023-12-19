@@ -322,6 +322,10 @@ public class ProhibitedMap extends MovementModel {
 	public static double independent_freq_class = 0.5;
 	public static double BUY_COFFEE_NEXT_DST = 0.5;
 	public static int queue_size = 0;
+	public static int ind_got_coffee = 0;
+	public static int dep_got_coffee = 0;
+	public static int ind_gave_up_coffee = 0;
+	public static int dep_gave_up_coffee = 0;
 	public static final int MAX_QUEUE = 10;
 	public int queue_position = 0; 
 
@@ -419,6 +423,8 @@ public class ProhibitedMap extends MovementModel {
 					queue_position = coffeShopQueue.getNodes().size() - 2;
 				} else {
 					nodestate = STATE.DEPENDENT;
+					if(this.getHost().groupId.equals("ind"))ProhibitedMap.ind_gave_up_coffee+=1;
+					else ProhibitedMap.dep_gave_up_coffee+=1;
 				}
 			}
 
@@ -444,6 +450,8 @@ public class ProhibitedMap extends MovementModel {
 
 			if (queue_position == -1) {
 				queue_size -= 1;
+				if(this.getHost().groupId.equals("ind"))ProhibitedMap.ind_got_coffee+=1;
+				else ProhibitedMap.dep_got_coffee+=1;
 
 				//starts coffee counter
 				this.getHost().isDrinkingCoffee=true;

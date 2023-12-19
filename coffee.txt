@@ -1,6 +1,6 @@
 
 Scenario.name = Coffee
-Scenario.endTime = 70000
+Scenario.endTime = 8000
 Scenario.updateInterval = 0.1
 Scenario.simulateConnections = false
 MovementModel.worldSize = 1000,1000
@@ -24,10 +24,11 @@ Group2.nrofInterfaces = 1
 Group2.interface1 = myInterface
 Group2.router = MovementChangingRouter
 
-Report.nrofReports = 2
+Report.nrofReports = 3
 Report.reportDir = reports/
 Report.report1 = EventLogReportCoffee
 Report.report2 = SamplingQueueSizeReport
+Report.report3 = QueueEndStatisticsReport
 
 ProhibitedMap.nrofMapFiles = 3
 ProhibitedMap.mapFile1 = data/Coffee/FMI_building.wkt
