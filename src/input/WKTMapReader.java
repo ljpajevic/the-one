@@ -107,6 +107,11 @@ public class WKTMapReader extends WKTReader {
 					updateMap(list);
 				}
 			}
+			else if (type.equals(POLYGON)) {
+				for (List<Coord> list : parseMultilinestring()) {
+					updateMap(list);
+				}
+			}
 			else {
 				// known type but not interesting -> skip
 				readNestedContents();
