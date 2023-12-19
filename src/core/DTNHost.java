@@ -36,6 +36,11 @@ public class DTNHost implements Comparable<DTNHost> {
 	private List<MovementListener> movListeners;
 	private List<NetworkInterface> net;
 	private ModuleCommunicationBus comBus;
+	public int timer = 0;
+
+	public boolean canBeInfluenced = false;
+	public boolean isDrinkingCoffee = false; 
+	public boolean sawCoffee = false; 
 
 	static {
 		DTNSim.registerForReset(DTNHost.class.getCanonicalName());
@@ -379,11 +384,13 @@ public class DTNHost implements Comparable<DTNHost> {
 		double distance;
 		double dx, dy;
 
+		timer += 1;
+
 		if (!isMovementActive() || SimClock.getTime() < this.nextTimeToMove) {
 			return;
 		}
 		if (this.destination == null) {
-			if (!setNextWaypoint()) {
+			if (!setNextWaypoint(timer)) {
 				return;
 			}
 		}
@@ -395,7 +402,7 @@ public class DTNHost implements Comparable<DTNHost> {
 			// node can move past its next destination
 			this.location.setLocation(this.destination); // snap to destination
 			possibleMovement -= distance;
-			if (!setNextWaypoint()) { // get a new waypoint
+			if (!setNextWaypoint(timer)) { // get a new waypoint
 				return; // no more waypoints left
 			}
 			distance = this.location.distance(this.destination);
@@ -415,9 +422,10 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @return True if there was a next waypoint to set, false if node still
 	 * should wait
 	 */
-	private boolean setNextWaypoint() {
+	private boolean setNextWaypoint(int timer) {
 		if (path == null) {
 			path = movement.getPath();
+			movement.setTimer(timer);
 		}
 
 		if (path == null || !path.hasNext()) {

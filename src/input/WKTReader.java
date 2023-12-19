@@ -24,6 +24,8 @@ public class WKTReader {
 	public static final String MULTILINESTRING = "MULTILINESTRING";
 	/** known WKT type POINT */
 	public static final String POINT = "POINT";
+	/** known WKT type POINT */
+	public static final String POLYGON = "POLYGON";
 	/** known WKT type MULTIPOINT */
 	public static final String MULTIPOINT = "MULTIPOINT";
 
