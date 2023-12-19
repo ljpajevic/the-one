@@ -38,6 +38,10 @@ public class DTNHost implements Comparable<DTNHost> {
 	private ModuleCommunicationBus comBus;
 	public int timer = 0;
 
+	public boolean canBeInfluenced = false;
+	public boolean isDrinkingCoffee = false; 
+	public boolean sawCoffee = false; 
+
 	static {
 		DTNSim.registerForReset(DTNHost.class.getCanonicalName());
 		reset();

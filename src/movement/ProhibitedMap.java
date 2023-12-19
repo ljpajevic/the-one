@@ -292,6 +292,8 @@ public class ProhibitedMap extends MovementModel {
 	public boolean mustleave = false;
 
 	public static final int CLASS_STARTIME = 20000, CLASS_DURATION = 10000; 
+	public static final int COFFEE_DRINKING_TIME = 50000;
+	public int coffee_timer = 0;
 	public int start_class_timer = CLASS_STARTIME; 
 	public int class_timer = 0; 
 	public boolean classended = false;
@@ -318,6 +320,16 @@ public class ProhibitedMap extends MovementModel {
 			classended = true;
 		}	
 
+		if (coffee_timer>0) coffee_timer= coffee_timer-1;
+		else this.getHost().isDrinkingCoffee=false;
+
+		if (this.getHost().sawCoffee==true){
+			this.getHost().canBeInfluenced=false;
+			this.getHost().sawCoffee=false;
+			nodestate = STATE.INDEPENDENT;
+		}
+
+
 		if (nodestate == STATE.NONARRIVED) {
 			arrived -= 1;
 			if (arrived == 0) {
@@ -333,13 +345,14 @@ public class ProhibitedMap extends MovementModel {
 		}
 		if (nodestate == STATE.ARRIVED) {
 			// decide if it is going to coffee shop or the queue
-			if (rng.nextDouble() < independent_freq) {
+			if ("ind".equals(this.getHost().groupId)) {
 				nodestate = STATE.INDEPENDENT;
 			} else {
 				nodestate = STATE.DEPENDENT;
+				
 			}
 		}	
-		
+	
 		if (nodestate == STATE.INDEPENDENT) {
 			// move closer to the queue
 			Coord c = this.randomCoord();
@@ -354,6 +367,7 @@ public class ProhibitedMap extends MovementModel {
 			rDistance = c.distance(queueEnqPos);
 			if (rDistance <= 5) {
 				if (queue_size < MAX_QUEUE) {
+					queue_size+=1;
 					nodestate = STATE.INDEPENDENT_QUEUE;
 					queue_position = coffeShopQueue.getNodes().size() - 2;
 				} else {
@@ -383,6 +397,11 @@ public class ProhibitedMap extends MovementModel {
 
 			if (queue_position == -1) {
 				queue_size -= 1;
+
+				//starts coffee counter
+				this.getHost().isDrinkingCoffee=true;
+				this.coffee_timer = COFFEE_DRINKING_TIME;
+
 				if (rng.nextDouble() < independent_freq_class) {
 					nodestate = STATE.GOING_TO_CLASSROOM;
 				} else {
@@ -429,6 +448,7 @@ public class ProhibitedMap extends MovementModel {
 			this.lastWaypoint = c;
 			return pq;
 		} else if (nodestate == STATE.LEAVING) {
+			this.getHost().canBeInfluenced=false;
 			Path pq = new Path( super.generateSpeed());
 			pq.addWaypoint( this.lastWaypoint.clone() );
 
@@ -471,6 +491,8 @@ public class ProhibitedMap extends MovementModel {
 
 			return pq;
 		} else if (nodestate == STATE.DEPENDENT) {
+
+			this.getHost().canBeInfluenced=true;
 			Path pq = new Path( super.generateSpeed());
 			pq.addWaypoint( this.lastWaypoint.clone() );
 			
@@ -490,6 +512,7 @@ public class ProhibitedMap extends MovementModel {
 			}
 			return pq;
 		} else if (nodestate == STATE.LEAVING) {
+			this.getHost().canBeInfluenced=false;
 			Path pq = new Path( super.generateSpeed());
 			pq.addWaypoint( this.lastWaypoint.clone() );
 
@@ -518,6 +541,7 @@ public class ProhibitedMap extends MovementModel {
 			this.lastWaypoint = c;
 			return pq;
 		} else if (nodestate == STATE.OUT) {
+			this.getHost().canBeInfluenced=false;
 			Path pq = new Path( super.generateSpeed());
 			pq.addWaypoint( this.lastWaypoint.clone() );
 			return pq;
