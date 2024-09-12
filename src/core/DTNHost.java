@@ -4,14 +4,14 @@
  */
 package core;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 import movement.MovementModel;
 import movement.Path;
 import routing.MessageRouter;
 import routing.util.RoutingInfo;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import static core.Constants.DEBUG;
 
@@ -30,11 +30,13 @@ public class DTNHost implements Comparable<DTNHost> {
 	private Path path;
 	private double speed;
 	private double nextTimeToMove;
+	public final String groupId;
 	private String name;
 	private List<MessageListener> msgListeners;
 	private List<MovementListener> movListeners;
 	private List<NetworkInterface> net;
 	private ModuleCommunicationBus comBus;
+	public int timer = 0;
 
 	static {
 		DTNSim.registerForReset(DTNHost.class.getCanonicalName());
@@ -51,13 +53,14 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @param mRouterProto Prototype of the message router of this host
 	 */
 	public DTNHost(List<MessageListener> msgLs,
-			List<MovementListener> movLs,
-			String groupId, List<NetworkInterface> interf,
-			ModuleCommunicationBus comBus,
-			MovementModel mmProto, MessageRouter mRouterProto) {
+                   List<MovementListener> movLs,
+                   String groupId, List<NetworkInterface> interf,
+                   ModuleCommunicationBus comBus,
+                   MovementModel mmProto, MessageRouter mRouterProto) {
 		this.comBus = comBus;
 		this.location = new Coord(0,0);
 		this.address = getNextAddress();
+		this.groupId = groupId;
 		this.name = groupId+address;
 		this.net = new ArrayList<NetworkInterface>();
 
@@ -377,11 +380,13 @@ public class DTNHost implements Comparable<DTNHost> {
 		double distance;
 		double dx, dy;
 
+		timer += 1;
+
 		if (!isMovementActive() || SimClock.getTime() < this.nextTimeToMove) {
 			return;
 		}
 		if (this.destination == null) {
-			if (!setNextWaypoint()) {
+			if (!setNextWaypoint(timer)) {
 				return;
 			}
 		}
@@ -393,8 +398,7 @@ public class DTNHost implements Comparable<DTNHost> {
 			// node can move past its next destination
 			this.location.setLocation(this.destination); // snap to destination
 			possibleMovement -= distance;
-			if (!setNextWaypoint()) { // get a new waypoint
-				this.destination = null; // No more waypoints left, therefore the destination must be null
+			if (!setNextWaypoint(timer)) { // get a new waypoint
 				return; // no more waypoints left
 			}
 			distance = this.location.distance(this.destination);
@@ -414,9 +418,10 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @return True if there was a next waypoint to set, false if node still
 	 * should wait
 	 */
-	private boolean setNextWaypoint() {
+	private boolean setNextWaypoint(int timer) {
 		if (path == null) {
 			path = movement.getPath();
+			movement.setTimer(timer);
 		}
 
 		if (path == null || !path.hasNext()) {

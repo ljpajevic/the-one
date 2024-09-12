@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import movement.MapBasedMovement;
+import movement.ProhibitedMap;
 import movement.MovementModel;
 import movement.map.SimMap;
 import routing.MessageRouter;
@@ -117,6 +118,8 @@ public class SimScenario implements Serializable {
 	private List<UpdateListener> updateListeners;
 	/** Global application event listeners */
 	private List<ApplicationListener> appListeners;
+	/** Prohibitted map */
+	private ProhibitedMap prohibitedMap;
 
 	static {
 		DTNSim.registerForReset(SimScenario.class.getCanonicalName());
@@ -249,7 +252,15 @@ public class SimScenario implements Serializable {
 	 * @return SimMap or null if no map is used
 	 */
 	public SimMap getMap() {
-		return this.simMap;
+		return this.prohibitedMap.getMap();
+	}
+
+	public SimMap getProhibitedMap() {
+		return this.prohibitedMap.getRestrMap();
+	}
+
+	public SimMap getQueue() {
+		return this.prohibitedMap.getQueueMap();
 	}
 
 	/**
@@ -388,6 +399,9 @@ public class SimScenario implements Serializable {
 			if (mmProto instanceof MapBasedMovement) {
 				this.simMap = ((MapBasedMovement)mmProto).getMap();
 			}
+
+			/* the forbidden movement model */
+			prohibitedMap = new ProhibitedMap();
 
 			// creates hosts of ith group
 			for (int j=0; j<nrofHosts; j++) {

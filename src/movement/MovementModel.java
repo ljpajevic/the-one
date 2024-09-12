@@ -203,6 +203,9 @@ public abstract class MovementModel {
 	 */
 	public abstract Path getPath();
 
+	// specify the timer for classes
+	public void setTimer(int timer) {};
+
 	/**
 	 * Returns a new initial placement for a node
 	 * @return The initial coordinates for a node

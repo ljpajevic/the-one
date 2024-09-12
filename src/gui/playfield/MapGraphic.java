@@ -4,12 +4,11 @@
  */
 package gui.playfield;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-
+import core.Coord;
 import movement.map.MapNode;
 import movement.map.SimMap;
-import core.Coord;
+
+import java.awt.*;
 
 /**
  * PlayfieldGraphic for SimMap visualization
@@ -48,6 +47,36 @@ public class MapGraphic extends PlayFieldGraphic {
 						scale(c.getX()), scale(c.getY()));
 			}
 		}
+	}
+
+	public void draw(Graphics2D g2, Color pathColor) {
+		Coord c,c2;
+
+		if (simMap == null) {
+			return;
+		}
+
+		g2.setColor(pathColor);
+		g2.setBackground(BG_COLOR);
+
+		// draws all edges between map nodes (bidirectional edges twice)
+		for (MapNode n : simMap.getNodes()) {
+			c = n.getLocation();
+
+			// draw a line to adjacent nodes
+			for (MapNode n2 : n.getNeighbors()) {
+				c2 = n2.getLocation();
+				g2.drawLine(scale(c2.getX()), scale(c2.getY()),
+						scale(c.getX()), scale(c.getY()));
+			}
+		}
+	}
+
+	/**
+	 * @return The simMap of the graphic
+	 */
+	public SimMap getMap(){
+		return simMap;
 	}
 
 }
